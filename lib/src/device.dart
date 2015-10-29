@@ -5,6 +5,7 @@
 library sky_tools.device;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -512,6 +513,9 @@ class AndroidDevice extends Device {
   static const String className = 'AndroidDevice';
   static final String defaultDeviceID = 'default_android_device';
 
+  static const String _SKY_SERVER_START_MSG = 'Serving';
+  static const Duration _SKY_SERVER_TIMEOUT = const Duration(seconds: 3);
+
   String productID;
   String modelID;
   String deviceCodeName;
@@ -773,8 +777,14 @@ class AndroidDevice extends Device {
           [adbPath, 'forward', observatoryPortString, observatoryPortString]);
 
       // Actually start the server.
-      await Process.start(sdkBinaryName('pub'), ['run', 'sky_tools:sky_server', _serverPort],
-          workingDirectory: serverRoot, mode: ProcessStartMode.DETACHED);
+      Process ps = await Process.start(
+          sdkBinaryName('pub'), ['run', 'sky_tools:sky_server', _serverPort],
+          workingDirectory: serverRoot,
+          mode: ProcessStartMode.DETACHED_WITH_STDIO
+      );
+      await ps.stdout.transform(UTF8.decoder)
+          .firstWhere((String value) => value.startsWith(_SKY_SERVER_START_MSG))
+          .timeout(_SKY_SERVER_TIMEOUT);
 
       // Set up reverse port-forwarding so that the Android app can reach the
       // server running on localhost.
